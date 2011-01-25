@@ -104,9 +104,21 @@ const char sqlite3IsEbcdicIdChar[] = {
 #endif
 
 
-/*
+/* &page tokenize_mod Stored Procedure Tokenize
+*/
+/**
 ** Return the length of the token that begins at z[0]. 
 ** Store the token type in *tokenType before returning.
+** 
+** @remark The tokenizer will consider any text between two
+** pairs of double dollar-sign as the text of a stored
+** procedure body text. eg. "$$my procedure body text.$$
+** used to implement CREATE PROCEDURE.
+**
+** @param[in] z pointer to input character buffer of sql text. 
+** @param[out] tokenType pointer to Token type defined in parse.h
+** @return length of Token, or TK_ILLEGAL upon error.
+** @ingroup stored_procs
 */
 int sqlite3GetToken(const unsigned char *z, int *tokenType){
   int i, c;
@@ -317,7 +329,17 @@ int sqlite3GetToken(const unsigned char *z, int *tokenType){
       ** a digit. Try to match #AAAA where AAAA is a parameter name. */
     }
 #ifndef SQLITE_OMIT_TCL_VARIABLE
-    case '$':
+    case '$': 
+# ifdef SQLITE_ENABLE_STOREDPROCS
+      {
+        if( z[1]=='$' && z[2]!=0 ) {
+          for(i=3, c=z[2]; (c!='$' || z[i]!='$') && (c=z[i])!=0; i++){}
+          if( c ) i++;
+          *tokenType = TK_PROCBODY;
+          return i;
+        }    
+      }
+# endif /* SQLITE_ENABLE_STOREDPROCS */
 #endif
     case '@':  /* For compatibility with MS SQL Server */
     case ':': {
@@ -426,6 +448,7 @@ int sqlite3RunParser(Parse *pParse, const char *zSql, char **pzErrMsg){
       pParse->rc = SQLITE_TOOBIG;
       break;
     }
+//printf("*** token: %d %.*s\n", tokenType, pParse->sLastToken.n, pParse->sLastToken.z);
     switch( tokenType ){
       case TK_SPACE: {
         if( db->u1.isInterrupted ){

@@ -31,6 +31,13 @@ if {[lsearch $argv --nostatic]>=0} {
 } else {
   set addstatic 1
 }
+
+if {[lsearch -regexp $argv SQLITE_ENABLE_STOREDPROCS]>=0} {
+  set enable_storedprocs 1
+} else {
+  set enable_storedprocs 0
+}
+
 set in [open tsrc/sqlite3.h]
 set cnt 0
 set VERSION ?????
@@ -307,6 +314,13 @@ foreach file {
    fts3_icu.c
 } {
   copy_file tsrc/$file
+}
+
+# process optional feature source files
+if {$enable_storedprocs} {
+  foreach file { proc.c } {
+    copy_file tsrc/$file
+  }
 }
 
 close $out

@@ -743,8 +743,8 @@ SHELL=${CONFIG_SHELL-/bin/sh}
 # Identity of this package.
 PACKAGE_NAME='sqlite'
 PACKAGE_TARNAME='sqlite'
-PACKAGE_VERSION='3.7.3'
-PACKAGE_STRING='sqlite 3.7.3'
+PACKAGE_VERSION='3.7.3.p1'
+PACKAGE_STRING='sqlite 3.7.3.p1'
 PACKAGE_BUGREPORT=''
 
 # Factoring default headers for most tests.
@@ -923,6 +923,7 @@ with_readline_inc
 enable_debug
 enable_amalgamation
 enable_load_extension
+enable_stored_procedures
 enable_gcov
 '
       ac_precious_vars='build_alias
@@ -1581,7 +1582,8 @@ Optional Features:
                           separately
   --enable-load-extension Enable loading of external extensions
   --enable-gcov           Enable coverage testing using gcov
-
+  --enable-stored-procedures Enable stored procedure grammar and base code.
+                              
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
@@ -13472,6 +13474,22 @@ if test "${use_loadextension}" = "yes" ; then
   OPT_FEATURE_FLAGS=""
 else
   OPT_FEATURE_FLAGS="-DSQLITE_OMIT_LOAD_EXTENSION=1"
+fi
+
+#########
+# See whether we want to include stored procedure grammar and
+# common (stored proc language-agnostic) base code.
+# Check whether --enable-stored-procedures was given.
+if test "${enable_stored_procedures+set}" = set; then
+  enableval=$enable_stored_procedures; use_storedprocedures=$enableval
+else
+  use_storedprocedures=no
+fi
+
+if test "${use_storedprocedures}" = "yes" ; then
+  OPT_FEATURE_FLAGS="-DSQLITE_ENABLE_STOREDPROCS=1"
+else
+  OPT_FEATURE_FLAGS=""
 fi
 
 #########

@@ -391,8 +391,125 @@ cmd ::= DROP VIEW ifexists(E) fullname(X). {
 }
 %endif  SQLITE_OMIT_VIEW
 
+///////////////////// The CREATE PROC statement /////////////////////////////
+//
+%ifdef SQLITE_ENABLE_STOREDPROCS
+
+%type sp_return_type {int}
+sp_return_type(A) ::= NULL. {A = SQLITE_NULL;}
+sp_return_type(A) ::= FLOAT. {A = SQLITE_FLOAT;}
+sp_return_type(A) ::= STRING. {A = SQLITE_TEXT;}
+sp_return_type(A) ::= INTEGER. {A = SQLITE_INTEGER;}
+sp_return_type(A) ::= RESULTSET. {A = SQLITE_SP_RESULTSET;}
+
+%type sp_return {int}
+sp_return ::= .
+sp_return(A) ::= RETURNS sp_return_type(X). {A = X;}
+
+// procparam_type is cut&paste copy of "typetoken" production
+%type procparam_type {Token}
+paramtype ::= .
+paramtype ::= procparam_type(X).  { 
+  sqlite3ProcParamType(pParse,&X);
+}
+
+procparam_type(A) ::= typename(X).   {A = X;}
+procparam_type(A) ::= typename(X) LP signed RP(Y). {
+  A.z = X.z;
+  A.n = (int)(&Y.z[Y.n] - X.z);
+}
+procparam_type(A) ::= typename(X) LP signed COMMA signed RP(Y). {
+  A.z = X.z;
+  A.n = (int)(&Y.z[Y.n] - X.z);
+}
+
+proc_params ::= LP proc_params_list RP. 
+proc_params_list ::= proc_params_list COMMA proc_param.
+proc_params_list ::= proc_param.
+proc_params_list ::=.
+
+proc_param(A) ::= paramid(X) paramtype. {
+  A.z = X.z;
+  A.n = (int)(pParse->sLastToken.z-X.z) + pParse->sLastToken.n;
+}
+
+paramid(A) ::= VARIABLE(X). {
+  A = X;
+  sqlite3ProcParamName(pParse, &A);
+}
+
+%type orreplace {int}
+orreplace(A) ::= OR REPLACE.  {A = 1;}
+orreplace(A) ::= .            {A = 0;}
+
+cmd ::= create_proc create_proc_params.
+
+create_proc ::= createkw(X) orreplace(R) PROC ifnotexists(E) nm(Y) dbnm(Z). {
+  sqlite3StartCreateProc(pParse, &X, &Y, &Z, R, E);
+}
+
+create_proc_params ::= proc_params sp_return(R) AS PROCBODY(B) LANGUAGE ids(L). {
+  sqlite3EndCreateProc(pParse, 0, &B, &L, R);
+}
+
+cmd ::= DROP PROC ifexists(E) fullname(X). {
+  sqlite3DropProc(pParse, X, E);
+}
+
+///////////////////// The EXECUTE PROCEDURE statement ///////////////////////
+//
+%type execpreamble {ExecProc *}
+%destructor execpreamble {sqlite3DbFree(pParse->db, $$);}
+
+execreturn(A)   ::= . {A.n = 0; A.z = 0;}
+execreturn(A)   ::= VARIABLE(X) EQ. {A = X;}
+execpreamble(A) ::= EXEC(W) execreturn(X) nm(Y) dbnm(Z). {
+  A = sqlite3DbMallocZero(pParse->db, sizeof(*A));
+  A->Begin           = W;
+  A->Return          = X;
+  A->Name1           = Y;
+  A->Name2           = Z;
+  pParse->pExecProc  = A;
+  pParse->pExecProc->procArgs = 0;
+  pParse->db->lookaside.bEnabled = 0;
+  //printf("*** Result table %.*s\n", A->ResultTable.n, A->ResultTable.z);
+}
+
+execargs ::= LP exprlist(X) RP(Y). { 
+  pParse->pExecProc->procArgs = X; 
+  pParse->pExecProc->End = Y; 
+}
+// would be nice to make args list parenthesis optional,
+// like Sybase/MS SQL Server, but not that familiar with 
+// lemon parser-generator and how to resolve left 
+// common prefixes, i.e. lookahead, etc.
+// This conflict due to "LP expr RP" production rule.
+//execargs ::= exprlist(X). { 
+//  pParse->pExecProc->procArgs = X; }
+//  pParse->pExecProc->End.z = X->a[nExpr-1].zSpan; 
+//  pParse->pExecProc->End.n = strlen(pEnd.x);
+//}
+
+cmd  ::= execpreamble execargs. { 
+  //printf("*** EXECPROC pParse: 0x%08.08x\n", (long)pParse);
+  sqlite3ExecProc(pParse, 
+    &pParse->pExecProc->Name1,
+    &pParse->pExecProc->Name2,
+    pParse->pExecProc->procArgs,
+    &pParse->pExecProc->Return);
+}
+
+// special prefixed select used for returning resultset from stored proc
+// by creating temp table
+cmd ::= SPRESULT select(S). {
+  printf("*** SPRESULT pParse: 0x%08.08x\n", (long)pParse);
+  sqlite3RenderResultSet(pParse, S);
+}
+%endif SQLITE_ENABLE_STOREDPROCS
+
 //////////////////////// The SELECT statement /////////////////////////////////
 //
+
 cmd ::= select(X).  {
   SelectDest dest = {SRT_Output, 0, 0, 0, 0};
   sqlite3Select(pParse, X, &dest);
@@ -813,6 +930,7 @@ term(A) ::= CTIME_KW(OP). {
   }
   spanSet(&A, &OP, &OP);
 }
+
 
 %include {
   /* This routine constructs a binary expression node out of two ExprSpan

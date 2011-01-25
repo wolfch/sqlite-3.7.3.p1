@@ -2191,9 +2191,35 @@ static int do_meta_command(char *zLine, struct callback_data *p){
 ** Return TRUE if a semicolon occurs anywhere in the first N characters
 ** of string z[].
 */
+#ifdef SQLITE_ENABLE_STOREDPROCS
+static int _contains_semicolon(const char *z, int N, int *readingProcBody){
+#else
 static int _contains_semicolon(const char *z, int N){
+#endif
   int i;
-  for(i=0; i<N; i++){  if( z[i]==';' ) return 1; }
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  int j,c;
+#endif
+  for(i=0; i<N; i++){  
+#ifdef SQLITE_ENABLE_STOREDPROCS
+    if( z[i]=='$' && z[i+1]=='$' && z[i+2]!=0 ) {
+      if (!readingProcBody) {
+        for(j=i+2, c=z[j++]; 
+          (c!='$' || z[j]!='$') && (c=z[j])!=0; 
+           j++){
+        }
+        if (c) j++;
+        i = j;
+      }
+      if(readingProcBody)
+        *readingProcBody = 0;
+      else
+        *readingProcBody = 1;
+    }
+#endif
+    if( z[i]==';' ) 
+      return 1; 
+  }
   return 0;
 }
 
@@ -2271,6 +2297,7 @@ static int process_input(struct callback_data *p, FILE *in){
   int errCnt = 0;
   int lineno = 0;
   int startline = 0;
+  int readingProcBody = 0;
 
   while( errCnt==0 || !bail_on_error || (in==0 && stdin_is_interactive) ){
     fflush(p->out);
@@ -2323,8 +2350,15 @@ static int process_input(struct callback_data *p, FILE *in){
       memcpy(&zSql[nSql], zLine, len+1);
       nSql += len;
     }
+#ifdef SQLITE_ENABLE_STOREDPROCS
+    if( zSql && _contains_semicolon(&zSql[nSqlPrior], 
+                             nSql-nSqlPrior, &readingProcBody)) {
+      if (readingProcBody || !sqlite3_complete(zSql))
+        continue;
+#else
     if( zSql && _contains_semicolon(&zSql[nSqlPrior], nSql-nSqlPrior)
                 && sqlite3_complete(zSql) ){
+#endif
       p->cnt = 0;
       open_db(p);
       BEGIN_TIMER;

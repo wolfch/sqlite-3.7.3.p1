@@ -1698,6 +1698,209 @@ void sqlite3CreateView(
 }
 #endif /* SQLITE_OMIT_VIEW */
 
+#ifdef SQLITE_ENABLE_STOREDPROCS
+
+#define NEW_PROC_PARAM(p) \
+    (((p) = (proc_param*)sqlite3_malloc(sizeof(proc_param)))!=(proc_param*)0 \
+     ?(proc_param*)memset((void*)(p),0,sizeof(proc_param)):(proc_param*)0)
+
+
+#define ROOT_PROC_PARAM(p) (PARSE_PROC_CTX((p))->root)
+#define CUR_PROC_PARAM(p) (PARSE_PROC_CTX((p))->cur)
+
+void sqlite3StartCreateProc(
+  Parse *pParse,     /* The parsing context */
+  Token *pBegin,     /* The CREATE token that begins the statement */
+  Token *pName1,     /* The token that holds the name of the proc */
+  Token *pName2,     /* The token that holds the name of the proc */
+  int nReplace,      /* Replace existing */
+  int noErr          /* bail, if it exists */
+){
+  sqlite3 *db = pParse->db;
+  Token nullToken;
+  nullToken.z = "Null";
+  nullToken.n = 4;
+
+  /*
+  pName2    = pName2==0?&nullToken:pName2;
+
+  printf("%.*s %.*s %.*s %d\n", 
+   pBegin->n, pBegin->z, pName1->n, pName1->z, pName2->n, pName2->z,
+   nReplace);
+  */
+
+  ParseProcCtx *ctx; 
+  proc_param *pParam;
+
+  if((pParam=NEW_PROC_PARAM(pParam)) == (proc_param*)0
+    || (ctx = sqlite3_malloc(sizeof(ParseProcCtx))) == (ParseProcCtx*)0) {
+    db->mallocFailed = 1;
+    pParse->rc = SQLITE_NOMEM;
+    pParse->nErr++;
+  }
+
+  ctx->pName1    = sqlite3_malloc(sizeof(Token));
+  ctx->pName1->z = sqlite3_malloc(pName1->n);
+  ctx->pName1->n = pName1->n;
+  (void)strncpy((char*)ctx->pName1->z, pName1->z, pName1->n);
+
+  ctx->pName2    = sqlite3_malloc(sizeof(Token));
+  ctx->pName2->z = sqlite3_malloc(pName2->n);
+  ctx->pName2->n = pName2->n;
+  (void)strncpy((char*)ctx->pName2->z, pName2->z, pName2->n);
+
+  ctx->noErr    = noErr;
+  ctx->nReplace = nReplace;
+  ctx->sqlStr   = pBegin->z;
+
+  pParse->pParseProcCtx   = ctx;
+  ROOT_PROC_PARAM(pParse) = pParam;
+  CUR_PROC_PARAM(pParse)  = pParam;
+}
+
+void sqlite3ProcParamName(Parse *pParse, Token *pName) {
+  proc_param *pp = CUR_PROC_PARAM(pParse);
+  pp->name = sqlite3_malloc(pName->n+1);
+  (void)strncpy(pp->name, pName->z, pName->n);
+  pp->name[pName->n] = '\0';
+}
+
+void sqlite3ProcParamType(Parse *pParse, Token *pType) {
+  proc_param *pp = CUR_PROC_PARAM(pParse);
+  pp->typeDecl = sqlite3_malloc(pType->n+1);
+  (void)strncpy(pp->typeDecl, pType->z, pType->n);
+  pp->typeDecl[pType->n] = '\0';
+  pp->affinity = sqlite3AffinityType((const char *)pp->typeDecl);
+  NEW_PROC_PARAM(pp->pNext);
+  CUR_PROC_PARAM(pParse) = pp->pNext;
+}
+
+#define SS(s) ((char*)0!=(s)?(s):"null")
+
+void sqlite3EndCreateProc(
+  Parse *pParse,
+  Token *pParams,
+  Token *pBody,        /* A string that will become the new proc */
+  Token *pLanguage,    /* Proc impl language name */
+  int    returnTypeCode /* declared return type SQLITE_INTEGER, SQLITE_FLOAT, etc. */
+){
+  sqlite3 *db = pParse->db;
+  Token nullToken;
+  nullToken.z = "Null";
+  nullToken.n = 4;
+
+  pParams   = pParams==0?&nullToken:pParams;
+  pBody     = pBody==0?&nullToken:pBody;
+  pLanguage = pLanguage==0?&nullToken:pLanguage;
+
+  /* if return type was not specified, default to SQLITE_NULL */
+  if (returnTypeCode == 0)
+    returnTypeCode = SQLITE_NULL;
+
+  /*printf("%.*s %.*s %.*s\n", 
+  pParams->n, pParams->z, pBody->n, pBody->z,
+  pLanguage->n, pLanguage->z);
+  printf("*** Returns: %d\n", returnTypeCode);
+  */
+
+  char *procbody = sqlite3_malloc(pBody->n);
+  char *language = sqlite3_malloc(pLanguage->n);
+
+  int c;
+  for (c=0; c<pBody->n-2; c++)
+    *(procbody+c) = *(pBody->z+c+2);
+  *(procbody+pBody->n-4) = '\0';
+
+  for (c=0; c<pLanguage->n; c++)
+    *(language+c) = *(pLanguage->z+c);
+  *(language+pLanguage->n) = '\0';
+
+  //printf("Proc language:|>%s<|, proc body: |>%s<|\n", language, procbody);
+
+  ParseProcCtx *ctx = PARSE_PROC_CTX(pParse);
+
+  ctx->sqlStrLen = (int)(pLanguage->z - ctx->sqlStr) + pLanguage->n;
+
+  //printf("*** CP: %*s\n", ctx->sqlStrLen, ctx->sqlStr);
+
+  
+#if 0 /* use sqlite_master table */
+  if( !db->init.busy ){
+    Vdbe *v;
+    char *z;
+    char *zName="foo";
+    int iDb;
+
+    /* Make an entry in the sqlite_master table */
+    v = sqlite3GetVdbe(pParse);
+    if( v==0 ) {
+      goto create_proc_done;
+    }
+    sqlite3BeginWriteOperation(pParse, 0, iDb);
+    z = sqlite3DbStrNDup(db, (char*)ctx->sqlStr, ctx->sqlStrLen);
+    sqlite3NestedParse(pParse,
+       "INSERT INTO %Q.%s VALUES('procedure',%Q,0,0,'%q')",
+       db->aDb[iDb].zName, SCHEMA_TABLE(iDb), zName, z);
+    sqlite3DbFree(db, z);
+    sqlite3ChangeCookie(pParse, iDb);
+    sqlite3VdbeAddOp4(v, OP_ParseSchema, iDb, 0, 0, sqlite3MPrintf(
+        db, "type='procedure' AND name='%q'", zName), P4_DYNAMIC
+    );
+  }
+#endif /*USE_SQLITE_MASTER*/
+
+  proc_param *pp = ROOT_PROC_PARAM(pParse);
+  while (pp && pp->name) {
+    printf("Param: %s %s %c\n", SS(pp->name), SS(pp->typeDecl), pp->affinity);
+    pp = pp->pNext;
+  }
+
+  if(sqlite3CreateProc(pParse, ctx->pName1, ctx->pName2,
+    procbody, ROOT_PROC_PARAM(pParse), returnTypeCode,
+    language, ctx->nReplace, ctx->noErr) != SQLITE_OK) {
+  }
+
+create_proc_done:
+  //sqliteDbFree(db, zSql);
+  sqlite3_free(language);
+  sqlite3_free(procbody);
+  pp = ROOT_PROC_PARAM(pParse);
+  while(pp && pp->name) {
+    proc_param *pNext = pp->pNext;
+    sqlite3_free(pp->name);
+    sqlite3_free(pp);
+    pp = pNext;
+  }
+  sqlite3_free(PARSE_PROC_CTX(pParse));
+}
+
+void sqlite3DropProc(Parse *pParse, SrcList *pName, int noErr){
+  sqlite3 *db = pParse->db;
+  int iDb;
+
+  if( db->mallocFailed ){
+    goto exit_drop_proc;
+  }
+  assert( pParse->nErr==0 );
+  assert( pName->nSrc==1 );
+  if( noErr ) db->suppressErr++;
+
+ 
+  int rowsDeleted = -1;
+  char *zErrMsg;
+  if( deleteProcSchema(db, pName->a[0].zName, &rowsDeleted, noErr, &zErrMsg) 
+    != SQLITE_OK) {
+      if (!noErr) {
+        sqlite3ErrorMsg(pParse, "Cannot drop proc \"%s\"", pName->a[0].zName);
+        pParse->nErr++;
+      }
+  }
+
+exit_drop_proc:
+  sqlite3SrcListDelete(db, pName);
+}
+#endif /*SQLITE_ENABLE_STOREDPROCS*/
+
 #if !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_VIRTUALTABLE)
 /*
 ** The Table structure pTable is really a VIEW.  Fill in the names of

@@ -6113,6 +6113,28 @@ int sqlite3_wal_checkpoint(sqlite3 *db, const char *zDb);
 # undef double
 #endif
 
+#ifdef SQLITE_ENABLE_STOREDPROCS
+/** @ingroup stored_procs */
+/*@{*/
+// these accessor/mutator functions are required
+// due to sqlite3 being opaque to client programs.
+/** For setting connection context for stored procs. */
+extern void setDbProcCtx(sqlite3 *db, void *p);
+/** For getting connection context for stored procs. */
+extern void *getDbProcCtx(sqlite3 *db);
+
+typedef struct ProcLangImpl ProcLangImpl;
+struct ProcLangImpl {
+  const char languageName[32];
+  int  (*procDbInit)(sqlite3*, char**);
+  void (*procDbFinalize)(sqlite3*);
+  ProcLangImpl *pNext;
+};
+extern ProcLangImpl *pProcLangImpl;
+/*@}*/
+
+#endif /* SQLITE_ENABLE_STOREDPROCS */
+
 #ifdef __cplusplus
 }  /* End of the 'extern "C"' block */
 #endif

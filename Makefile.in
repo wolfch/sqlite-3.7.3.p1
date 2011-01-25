@@ -285,6 +285,11 @@ SRC = \
   $(TOP)/src/walker.c \
   $(TOP)/src/where.c
 
+ifeq (SQLITE_ENABLE_STOREDPROCS, \
+    $(findstring SQLITE_ENABLE_STOREDPROCS,$(OPT_FEATURE_FLAGS)))
+  SRC += $(TOP)/src/proc.c
+endif
+
 # Source code for extensions
 #
 SRC += \
@@ -508,7 +513,7 @@ sqlite3$(TEXE):	$(TOP)/src/shell.c libsqlite3.la sqlite3.h
 	touch .target_source
 
 sqlite3.c:	.target_source $(TOP)/tool/mksqlite3c.tcl
-	$(TCLSH_CMD) $(TOP)/tool/mksqlite3c.tcl
+	$(TCLSH_CMD) $(TOP)/tool/mksqlite3c.tcl $(OPT_FEATURE_FLAGS)
 
 # Rule to build the amalgamation
 #
@@ -678,6 +683,12 @@ prepare.lo:	$(TOP)/src/prepare.c $(HDR)
 
 printf.lo:	$(TOP)/src/printf.c $(HDR)
 	$(LTCOMPILE) $(TEMP_STORE) -c $(TOP)/src/printf.c
+
+ifeq (SQLITE_ENABLE_STOREDPROCS, \
+    $(findstring SQLITE_ENABLE_STOREDPROCS,$(OPT_FEATURE_FLAGS)))
+proc.lo:	$(TOP)/src/proc.c $(HDR)
+	$(LTCOMPILE) $(TEMP_STORE) -c $(TOP)/src/proc.c
+endif
 
 random.lo:	$(TOP)/src/random.c $(HDR)
 	$(LTCOMPILE) $(TEMP_STORE) -c $(TOP)/src/random.c

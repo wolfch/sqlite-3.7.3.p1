@@ -742,6 +742,12 @@ int sqlite3_close(sqlite3 *db){
   if( db->pErr ){
     sqlite3ValueFree(db->pErr);
   }
+
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  // must be called before sqlite3CloseExtensions(...)
+  sqlite3ProcDbFinalize(db); 
+#endif 
+
   sqlite3CloseExtensions(db);
 
   db->magic = SQLITE_MAGIC_ERROR;
@@ -1934,6 +1940,14 @@ static int openDatabase(
   }
 #endif
 
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  if( !db->mallocFailed && rc==SQLITE_OK){
+    char *zErrMsg;
+    if((rc = sqlite3ProcDbInit(&db, &zErrMsg)) != SQLITE_OK) {
+      sqlite3Error(db, rc, zErrMsg);
+    }
+  }
+#endif
   sqlite3Error(db, rc, 0);
 
   /* -DSQLITE_DEFAULT_LOCKING_MODE=1 makes EXCLUSIVE the default locking

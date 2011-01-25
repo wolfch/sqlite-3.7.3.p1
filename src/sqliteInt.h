@@ -636,6 +636,12 @@ typedef struct Walker Walker;
 typedef struct WherePlan WherePlan;
 typedef struct WhereInfo WhereInfo;
 typedef struct WhereLevel WhereLevel;
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  typedef struct ParseProcCtx ParseProcCtx;
+  typedef struct ExecProc ExecProc;
+  typedef struct SpResultset SpResultset;
+  typedef struct ConnProcCtx ConnProcCtx;
+#endif 
 
 /*
 ** Defer sourcing vdbe.h and btree.h until after the "u8" and 
@@ -885,6 +891,9 @@ struct sqlite3 {
   void *pUnlockArg;                     /* Argument to xUnlockNotify */
   void (*xUnlockNotify)(void **, int);  /* Unlock notify callback */
   sqlite3 *pNextBlocked;        /* Next in list of all blocked connections */
+#endif
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  ConnProcCtx *pConnProcCtx;
 #endif
 };
 
@@ -2213,7 +2222,15 @@ struct Parse {
   int nHeight;            /* Expression tree height of current sub-select */
   Table *pZombieTab;      /* List of Table objects to delete after code gen */
   TriggerPrg *pTriggerPrg;    /* Linked list of coded triggers */
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  ParseProcCtx *pParseProcCtx;
+  ExecProc     *pExecProc;
+#endif
 };
+
+#ifdef SQLITE_ENABLE_STOREDPROCS
+# define PARSE_PROC_CTX(p) ((ParseProcCtx*)(p)->pParseProcCtx)
+#endif
 
 #ifdef SQLITE_OMIT_VIRTUALTABLE
   #define IN_DECLARE_VTAB 0
@@ -2650,6 +2667,108 @@ void sqlite3CreateView(Parse*,Token*,Token*,Token*,Select*,int,int);
 #else
 # define sqlite3ViewGetColumnNames(A,B) 0
 #endif
+
+#ifdef SQLITE_ENABLE_STOREDPROCS
+
+  struct ExecProc {
+    Token    Begin;
+    Token    Name1;
+    Token    Name2;
+    ExprList *procArgs;
+    Token    Return;
+    Token    End;
+    Token    ResultTable;
+  };
+
+  struct SpResultset {
+    Select *select;
+    struct SpResultset *next;
+  };
+
+  /* per-connection stored proc language implementation context. */
+  struct ConnProcCtx {
+    void        *procLangImpl;
+    SpResultset *pResultsetStack;
+  };
+
+  struct proc_param {
+    char affinity;
+    char *name;
+    char *typeDecl;
+    struct proc_param *pNext;
+  };
+  typedef struct proc_param proc_param;
+
+/* other types defined in sqlite3.h */
+#define SQLITE_SP_RESULTSET 99 
+
+  /* per-statement stored proc parse context */
+  struct ParseProcCtx {
+    Token           *pName1;
+    Token           *pName2;
+    int              noErr;
+    int              nReplace;
+    proc_param      *root;
+    proc_param      *cur;
+    const char      *sqlStr;
+    int              sqlStrLen;
+    int              returnTypeCode;
+#if 0
+    union {
+      int            intVal;
+      sqlite3_int64  int64val;
+      double         doubleVal;
+      const char    *textVal; 
+      const void    *text16Val;
+      const void    *text16leVal;
+      const void    *text16beVal;
+      sqlite3_value *valueVal;
+      Select        *resultSet;
+    }                result;
+#endif
+    /* per-statement stored proc language implementation context */
+    void            *parseProcLangImpl;
+  };
+
+void sqlite3StartCreateProc(
+  Parse *pParse,
+  Token *pBegin,
+  Token *pName1,
+  Token *pName2,
+  int nReplace,
+  int noErr);
+
+void sqlite3ProcParamName(Parse *pParse, Token *pName);
+void sqlite3ProcParamType(Parse *pParse, Token *pType);
+
+void sqlite3EndCreateProc(
+  Parse *pParse,
+  Token *pParams,
+  Token *pBody,
+  Token *pLanguage,
+  int returnTypeCode);
+
+void sqlite3DropProc(Parse *pParse, SrcList *pName, int noErr);
+
+int deleteProcSchema(
+  sqlite3     *db,
+  const char  *procName,
+  int         *rowsDeleted,
+  int          noErr,
+  char       **ppzErrMsg);
+
+void sqlite3ExecProc(
+  Parse *pParse,
+  Token *pName1,
+  Token *pName2,
+  ExprList *procArgs,
+  Token *pReturn);
+
+void sqlite3RenderResultSet(Parse *pParse, Select *s);
+
+void sqlite3ProcDbFinalize(sqlite3 *db);
+int sqlite3ProcDbInit(sqlite3 **pDb, char **pzErrMsg);
+#endif /* SQLITE_ENABLE_STOREDPROCS */
 
 void sqlite3DropTable(Parse*, SrcList*, int, int);
 void sqlite3DeleteTable(sqlite3*, Table*);

@@ -138,6 +138,11 @@ struct Keyword {
 #else
 #  define AUTOVACUUM 0x00020000
 #endif
+#ifndef SQLITE_ENABLE_STOREDPROCS
+#  define PROC 0
+#else
+#  define PROC 0x00040000
+#endif
 
 /*
 ** These are the keywords
@@ -188,6 +193,10 @@ static Keyword aKeywordTable[] = {
   { "ESCAPE",           "TK_ESCAPE",       ALWAYS                 },
   { "EXCEPT",           "TK_EXCEPT",       COMPOUND               },
   { "EXCLUSIVE",        "TK_EXCLUSIVE",    ALWAYS                 },
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  { "EXEC",             "TK_EXEC",         ALWAYS                 },
+  { "EXECUTE",          "TK_EXEC",         ALWAYS                 },
+#endif
   { "EXISTS",           "TK_EXISTS",       ALWAYS                 },
   { "EXPLAIN",          "TK_EXPLAIN",      EXPLAIN                },
   { "FAIL",             "TK_FAIL",         CONFLICT|TRIGGER       },
@@ -214,6 +223,10 @@ static Keyword aKeywordTable[] = {
   { "ISNULL",           "TK_ISNULL",       ALWAYS                 },
   { "JOIN",             "TK_JOIN",         ALWAYS                 },
   { "KEY",              "TK_KEY",          ALWAYS                 },
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  { "LANG",             "TK_LANGUAGE",     ALWAYS                 },
+  { "LANGUAGE",         "TK_LANGUAGE",     ALWAYS                 },
+#endif
   { "LEFT",             "TK_JOIN_KW",      ALWAYS                 },
   { "LIKE",             "TK_LIKE_KW",      ALWAYS                 },
   { "LIMIT",            "TK_LIMIT",        ALWAYS                 },
@@ -232,6 +245,10 @@ static Keyword aKeywordTable[] = {
   { "PLAN",             "TK_PLAN",         EXPLAIN                },
   { "PRAGMA",           "TK_PRAGMA",       PRAGMA                 },
   { "PRIMARY",          "TK_PRIMARY",      ALWAYS                 },
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  { "PROC",             "TK_PROC",         PROC                   },
+  { "PROCEDURE",        "TK_PROC",         PROC                   },
+#endif
   { "QUERY",            "TK_QUERY",        EXPLAIN                },
   { "RAISE",            "TK_RAISE",        TRIGGER                },
   { "REFERENCES",       "TK_REFERENCES",   FKEY                   },
@@ -241,12 +258,19 @@ static Keyword aKeywordTable[] = {
   { "RENAME",           "TK_RENAME",       ALTER                  },
   { "REPLACE",          "TK_REPLACE",      CONFLICT               },
   { "RESTRICT",         "TK_RESTRICT",     FKEY                   },
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  { "RESULTSET",        "TK_RESULTSET",    ALWAYS                 },
+  { "RETURNS",          "TK_RETURNS",      ALWAYS                 },
+#endif
   { "RIGHT",            "TK_JOIN_KW",      ALWAYS                 },
   { "ROLLBACK",         "TK_ROLLBACK",     ALWAYS                 },
   { "ROW",              "TK_ROW",          TRIGGER                },
   { "SAVEPOINT",        "TK_SAVEPOINT",    ALWAYS                 },
   { "SELECT",           "TK_SELECT",       ALWAYS                 },
   { "SET",              "TK_SET",          ALWAYS                 },
+#ifdef SQLITE_ENABLE_STOREDPROCS
+  { "SPRESULT",         "TK_SPRESULT",     ALWAYS                 },
+#endif
   { "TABLE",            "TK_TABLE",        ALWAYS                 },
   { "TEMP",             "TK_TEMP",         ALWAYS                 },
   { "TEMPORARY",        "TK_TEMP",         ALWAYS                 },
