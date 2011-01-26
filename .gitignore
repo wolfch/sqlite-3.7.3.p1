@@ -5,3 +5,4 @@ ext/pyproc/libpyproc.*
 ext/pyproc/*.o
 *.swp
 src/createproc_test
+codedoc
