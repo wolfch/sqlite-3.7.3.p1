@@ -1,0 +1,32 @@
+INCLUDES = -I.
+INCLUDES += -I../../build
+INCLUDES += -I../../src
+INCLUDES += -I/usr/include/python2.6
+
+CC=/usr/bin/gcc
+
+CFLAGS=-g -O2 -DSQLITE_OS_UNIX=1 -DNDEBUG -DEXPERIMENTAL=1 -DNDEBUG=1 \
+       -DAPSW_FORK_CHECKER=1 -DPIC $(INCLUDES)
+
+
+LDFLAGS=-shared -lpython2.6 -lpthread -ldl -L../../build/.libs -lsqlite3 
+
+SRCS= pyproc.c
+
+LIBNAME=libpyproc
+
+OBJS = $(SRCS:%.c=%.o)
+
+all: ${LIBNAME}.dylib
+	cp ${LIBNAME}.dylib ../../build/.libs/
+	cp ${LIBNAME}.dylib ../../build/
+
+${LIBNAME}.dylib : $(OBJS)
+	gcc $(LDFLAGS) -o ${LIBNAME}.dylib $(OBJS)
+
+docpp:
+	cpp $(INCLUDES) pyproc.c > pyproc.c.txt
+
+clean:
+	rm -f *.o
+	rm -f *.dylib
