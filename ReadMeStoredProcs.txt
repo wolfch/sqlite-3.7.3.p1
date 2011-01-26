@@ -111,20 +111,32 @@ I also had problems hacking the APSW module to accept a sqlite3* pointer,
 which is another reason I used the pysqlite2 module instead.
 
 Here is an example of a Python stored procedure:
+(using old-style exception handling to support Python-2.4
+ on MacOSX)
 
 create or replace proc pytest3() returns resultset as $$
   from pysqlite2 import dbapi2 as sqlite3
+  import sys
   con = sqlite3.connect()
   con.row_factory = sqlite3.Row
   cur = con.cursor()
-
   try:
-    cur.execute('spresult select * from dept')
-  except apsw.SQLError, (errmsg):
-    print "apsw.SQLError: %s" % (errmsg)
-  except:
-    "Unexpected error:", sys.exc_info()[0]
+      try:
+          cur.execute('spresult select * from sqlite_master')
+      except sqlite3.OperationalError, (errmsg):
+          print "sqlite3.OperationalError: %s" % (errmsg)
+      except sqlite3.ProgrammingError, (errmsg):
+          print "sqlite3.ProgrammingError: %s" % (errmsg)
+      except:
+          print "Unexpected error: %s" % sys.exc_info()[0]
+  finally:
+      try:
+          # releases recources, doesn't actually close sqlite3* handle
+          con.close()  
+      except:
+          print "Unexpected error closing cursor: %s", sys.exc_info()[0]
 $$ language python;
+
 
 This implementation for Python stored procs is accomplished by  creating a 
 Python interpreter instance; then taking the current connection, (of type sqlite3*) 
