@@ -7,5 +7,4 @@
 #
 ../configure --enable-load-extension --enable-debug --enable-stored-procedures
 #../configure --enable-load-extension --enable-debug 
-#../configure --enable-load-extension --enable-debug CFLAGS=-DSQLITE_ENABLE_STOREDPROCS
 #../configure --enable-load-extension --disable-amalgamation

@@ -2,17 +2,22 @@
 #include <stdlib.h>
 #include <sqlite3.h>
 
+/*
+ * This utility creates a stored proc from the statically
+ * initialized string, "cpSql".  This is used because there 
+ * are still problems with shell.c dealing with $$....$$.
+ */
+
 const char *cpSql =
 "create or replace proc pytest3()\n"
 "returns resultset as $$\n"
 "from pysqlite2 import dbapi2 as sqlite3\n"
 "import sys\n"
 "con = sqlite3.connect()\n"
-"#con = sqlite3.connect('/Users/cwolf/src/sqlite-3.7.3.p1/build/demo.sqlite')\n"
 "con.row_factory = sqlite3.Row\n"
 "cur = con.cursor()\n"
 "try:\n"
-"  cur.execute('spresult select * from dept')\n"
+"  cur.execute('spresult select * from sqlite_master')\n"
 "except sqlite3.OperationalError, (errmsg):\n"
 "  con.close()\n"
 "  print \"sqlite3.OperationalError: %s\" % (errmsg)\n"

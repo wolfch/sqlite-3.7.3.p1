@@ -2,6 +2,8 @@ This directory contains source code to
 
     SQLite: An Embeddable SQL Database Engine
 
+For the stored procedures modification, please read ReadMeStoredProcs.txt
+
 To compile the project, first create a directory in which to place
 the build products.  It is recommended, but not required, that the
 build directory be separate from the source directory.  Cd into the
@@ -37,3 +39,5 @@ AWK.
 Contacts:
 
    http://www.sqlite.org/
+
+For the stored procedures modification, please read ReadMeStoredProcs.txt
