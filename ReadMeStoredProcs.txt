@@ -175,6 +175,15 @@ $ cd sqlite-3.7.3/ext/pyproc
 $ make -f Makefile.darwin  (on Mac)
 $ make -f Makefile.linux   (on Linux)
 
+Generating code documentation using "doxygen"
+(see http://www.doxygen.org)
+
+$ cd sqlite-3.7.3
+$ doxygen
+[lots of output... the directory "codegen" is created and populated]
+
+Open: codedoc/html/index.html
+
 Precompiled binaries are checked in for MacOSX and Linux in
 ./bin/darmin and ./bin/linux, respectively.
 
