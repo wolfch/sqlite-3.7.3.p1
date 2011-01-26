@@ -175,16 +175,6 @@ $ cd sqlite-3.7.3/ext/pyproc
 $ make -f Makefile.darwin  (on Mac)
 $ make -f Makefile.linux   (on Linux)
 
+Precompiled binaries are checked in for MacOSX and Linux in
+./bin/darmin and ./bin/linux, respectively.
 
-
-
-
-
-
-
-
-
-
-
-
- 
