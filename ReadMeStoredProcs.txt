@@ -152,7 +152,7 @@ Building:
 
 The “runconfigure.sh” script is just a one-liner:
 
-../configure --enable-load-extension --enable-debug –enable-stored-procedures
+../configure --enable-load-extension --enable-debug --enable-stored-procedures
 
 
 $ git clone git://github.com/wolfch/sqlite-3.7.3
